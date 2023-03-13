@@ -1,0 +1,9 @@
+networkx
+streamlit
+numpy
+pandas
+matplotlib
+netlsd
+numpy
+scikit-learn
+multiprocessing
