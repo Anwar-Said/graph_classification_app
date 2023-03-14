@@ -8,6 +8,7 @@ from itertools import repeat
 import pickle
 import numpy as np
 import networkx as nx
+import sys
 
 def train_with_10_folds(embeddings,labels):
     estimator  = RandomForestClassifier(criterion='gini', max_depth=None, min_weight_fraction_leaf=0.0,
@@ -20,16 +21,16 @@ def train_with_10_folds(embeddings,labels):
     st.write("accuracy:", round(np.mean(score)*100,3))
     
 def train_fixed_train_test(embeddings, labels):
-    X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=0.2, random_state=123)
+    X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=0.2, random_state=123,stratify=labels)
     estimator  = RandomForestClassifier(criterion='gini', max_depth=None, min_weight_fraction_leaf=0.0,
                                             max_leaf_nodes=None, bootstrap=True, 
                                             oob_score=False, n_jobs=5,verbose=0, warm_start=False,
                                             class_weight=None)
     estimator.fit(X_train, y_train)
-    # name = "models/MUTAG_NetLSD_trained.sav"
-    # pickle.dump(estimator, open(name,'wb'))
-    # test_obj = {"embeddings":np.array(X_test), "labels":y_test}
-    # pickle.dump(test_obj,open("data/MUTAG_DGSD_test_set.pkl","wb"))
+    name = "models/PTC_NetLSD_trained.sav"
+    pickle.dump(estimator, open(name,'wb'))
+    test_obj = {"embeddings":np.array(X_test), "labels":y_test}
+    pickle.dump(test_obj,open("data/PTC_NetLSD_test_set.pkl","wb"))
     pred = estimator.predict(X_test)
     acc = accuracy_score(pred, y_test)
     st.write("accuracy:", round(acc*100,3))
@@ -39,7 +40,7 @@ def train_descriptor(dataset,model, eval, metric):
     if model=="DGSD":
         dgsd = DGSD()
         embeddings = [dgsd.get_descriptor(g,bins = 50, workers = 1) for g in graphs]
-    else:
+    elif model=="NetLSD":
         embeddings = [netlsd.heat(g) for g in graphs]
     if eval=="10-folds":
         train_with_10_folds(embeddings,labels)
@@ -47,12 +48,15 @@ def train_descriptor(dataset,model, eval, metric):
         train_fixed_train_test(embeddings,labels)
 
 def train_model(dataset_name,model, eval, metric):
+        
     with open('data/'+dataset_name+'.pkl', 'rb') as file:
         dataset = pickle.load(file)
         file.close()
     st.write(dataset_name," loaded successfully")
     if model=="DGSD" or model=="NetLSD":
         train_descriptor(dataset,model, eval, metric)
+    else:
+        st.write("not implemented yet!")
 
 
 
@@ -61,14 +65,31 @@ def inference_with_pre_trained(dataset,model, eval, metric):
     test_data = pickle.load(open("data/"+dataset+"_"+model+"_test_set.pkl","rb"))
     pred = estimator.predict(test_data['embeddings'])
     acc = accuracy_score(pred, test_data['labels'])
+    
+
     st.write("accuracy:", round(acc*100,3))
-    
 
     
 
+  
+def classify_graph(graph):
+    name = "models/shapes_NetLSD_trained.sav"
+    estimator = pickle.load(open(name, "rb"))
+    emb = netlsd.heat(graph).reshape(1,-1)
+    pred = list(estimator.predict_proba(emb).reshape(-1,))
+    results = {'complete_graph':pred[0],'cycle_graph':pred[1],
+               'ladder_graph':pred[2],'path_graph':pred[3],
+               'star_graph':pred[4],'wheel_graph':pred[5]
+               ,'barbell_graph':pred[6],'lollipop_graph':pred[7],
+               'fast_gnp_random_graph':pred[8],'turan_graph':pred[9]}
+    st.write("Predicted Probabilities")
+    st.write(results)
 
 def run_model(dataset,model, eval, metric,train):
-    st.write("Button clicked!",dataset,model, metric)
+   
+    if model=='GCN' or model=='GAT':
+        st.write("not implemented yet!")
+        sys.exit()
     if train=="train":
         train_model(dataset,model, eval, metric)
     else:
